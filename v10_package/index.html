@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="매일흥양">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#b71c1c">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>매일흥양 사고처리 v10</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --red:#c62828;--red2:#ef5350;--blue:#0d47a1;--blue2:#1e88e5;
+  --green:#1b5e20;--green2:#43a047;--orange:#e65100;
+  --dark:#0d1117;--card:#161b22;--card2:#1e2736;
+  --border:#21262d;--text:#e8eaf6;--sub:#78909c;
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--dark);color:var(--text);
+  max-width:480px;margin:0 auto;display:flex;flex-direction:column}
+
+/* ══ 스플래시 ══ */
+#splash{position:fixed;inset:0;max-width:480px;margin:0 auto;z-index:9999;
+  background:linear-gradient(155deg,#7b0000 0%,#b71c1c 45%,#0d47a1 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .5s ease}
+#splash.off{opacity:0;pointer-events:none}
+#splash.gone{display:none!important}
+.sp-bus{font-size:76px;animation:bob 2.5s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.sp-h1{font-size:36px;font-weight:900;color:#fff;margin:16px 0 4px}
+.sp-h2{font-size:20px;color:rgba(255,255,255,.6)}
+/* ★ 시작 버튼 — touch-action:manipulation 필수 ★ */
+#btnBoot{
+  margin-top:44px;background:#fff;color:#b71c1c;
+  border:none;border-radius:50px;padding:18px 56px;
+  font-size:32px;font-weight:900;cursor:pointer;font-family:inherit;
+  box-shadow:0 8px 40px rgba(0,0,0,.4);transition:transform .12s;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  -webkit-appearance:none;appearance:none}
+#btnBoot:active{transform:scale(.95)}
+.sp-hint{margin-top:18px;background:rgba(0,0,0,.28);border-radius:12px;
+  padding:12px 22px;font-size:16px;color:rgba(255,255,255,.75);
+  text-align:center;line-height:1.8;max-width:300px}
+
+/* ══ 탑바 ══ */
+#topbar{background:var(--card);padding:12px 16px;
+  display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+#topTitle{font-size:20px;font-weight:900;flex:1}
+.tb-btn{background:none;border:none;font-size:26px;cursor:pointer;color:var(--text);
+  padding:4px 8px;touch-action:manipulation}
+
+/* ══ 탭바 ══ */
+#tabbar{background:var(--card);border-top:1px solid var(--border);
+  display:flex;flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px)}
+.tab{flex:1;padding:10px 0 8px;text-align:center;cursor:pointer;touch-action:manipulation}
+.tab .ti{font-size:26px;display:block}
+.tab .tl{font-size:12px;color:var(--sub);margin-top:2px;display:block;font-weight:700}
+.tab.on .tl{color:var(--red2)}
+.tab.on .ti{filter:drop-shadow(0 0 5px var(--red2))}
+
+/* ══ 스크롤 ══ */
+#scrollArea{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.page{display:none;padding:14px 14px 24px}
+.page.on{display:block;animation:fu .2s}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.stitle{font-size:12px;font-weight:700;color:var(--sub);letter-spacing:1.2px;margin:16px 0 10px 2px;text-transform:uppercase}
+
+/* ══ GPS 바 ══ */
+.gps-bar{background:var(--card2);border-radius:14px;padding:12px 16px;margin-bottom:14px;
+  display:flex;align-items:center;gap:10px;border:1px solid var(--border)}
+.gps-led{width:10px;height:10px;border-radius:50%;background:var(--sub);flex-shrink:0;transition:all .3s}
+.gps-led.on{background:#4caf50;box-shadow:0 0 8px #4caf50}
+.gps-led.spin{background:#ff9800;animation:blink .5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.gps-txt{flex:1;font-size:12px;color:#90caf9;line-height:1.6}
+.gps-retry{background:none;border:1px solid #1e88e5;color:#1e88e5;border-radius:20px;
+  padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;
+  flex-shrink:0;touch-action:manipulation}
+
+/* ══ SOS ══ */
+.sos-wrap{position:relative;margin-bottom:16px}
+.sos-ring{position:absolute;inset:-3px;border-radius:22px;border:2px solid rgba(239,83,80,.45);
+  animation:ring 2s infinite;pointer-events:none}
+@keyframes ring{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.03);opacity:0}}
+.sos-btn{width:100%;background:linear-gradient(135deg,#7b0000,#c62828 50%,#ef5350);
+  border:none;border-radius:20px;padding:20px;cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;gap:16px;box-shadow:0 6px 28px rgba(198,40,40,.5);
+  text-align:left;transition:transform .12s;touch-action:manipulation}
+.sos-btn:active{transform:scale(.97)}
+.sos-icon{font-size:44px;flex-shrink:0}
+.sos-main{font-size:22px;font-weight:900;color:#fff}
+.sos-sub{font-size:12px;color:rgba(255,255,255,.85);margin-top:5px;line-height:1.7}
+
+/* ══ 긴급전화 ══ */
+.call-card{background:var(--card);border-radius:14px;padding:13px 16px;margin-bottom:8px;
+  display:flex;align-items:center;gap:12px;text-decoration:none;border:1px solid var(--border);transition:opacity .15s}
+.call-card:active{opacity:.7}
+.cc-icon{font-size:26px;flex-shrink:0}
+.cc-name{font-size:12px;color:var(--sub);font-weight:700}
+.cc-num{font-size:20px;font-weight:900;color:var(--red2)}
+.cc-btn{background:var(--red);color:#fff;border:none;border-radius:50px;
+  padding:8px 16px;font-size:13px;font-weight:900;cursor:pointer;font-family:inherit;margin-left:auto}
+
+/* ══ 스텝 인디케이터 ══ */
+.step-indicator{display:flex;align-items:center;margin-bottom:16px;overflow-x:auto;scrollbar-width:none;padding:4px 0}
+.step-indicator::-webkit-scrollbar{display:none}
+.si-node{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.si-circle{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+  color:var(--sub);background:var(--card);transition:all .3s}
+.si-circle.done{background:var(--green2);border-color:var(--green2);color:#fff}
+.si-circle.active{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 0 10px rgba(239,83,80,.5)}
+.si-label{font-size:10px;color:var(--sub);margin-top:3px;white-space:nowrap}
+.si-label.active{color:var(--red2)}
+.si-line{flex:1;height:2px;background:var(--border);margin:0 3px;margin-bottom:14px;min-width:8px;transition:background .3s}
+.si-line.done{background:var(--green2)}
+
+/* ══ 단계 카드 ══ */
+.step-card{background:var(--card);border-radius:18px;border:1px solid var(--border);overflow:hidden}
+.step-head{padding:14px 16px;display:flex;align-items:center;gap:12px}
+.step-icon{font-size:36px;flex-shrink:0}
+.step-title{font-size:20px;font-weight:900}
+.step-desc{font-size:12px;color:var(--sub);margin-top:3px}
+
+/* ══ 액션 아이템 ══ */
+.action-item{border-top:1px solid var(--border);padding:14px 16px;display:flex;align-items:flex-start;gap:10px}
+.action-item.done-item{background:#0a150a}
+.ai-num{width:22px;height:22px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:2px}
+.action-item.done-item .ai-num{background:var(--green2);color:#fff}
+.ai-body{flex:1}
+.ai-title{font-size:16px;font-weight:900;line-height:1.5}
+.action-item.done-item .ai-title{color:#81c784}
+.ai-desc{font-size:12px;color:var(--sub);margin-top:5px;line-height:1.7}
+.ai-check{width:22px;height:22px;border-radius:6px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-top:2px;transition:all .2s}
+.action-item.done-item .ai-check{background:var(--green2);border-color:var(--green2);color:#fff}
+
+/* ══ 버튼 ══ */
+.btn-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.abtn{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:24px;
+  padding:9px 16px;font-size:13px;font-weight:900;cursor:pointer;font-family:inherit;
+  transition:opacity .15s;touch-action:manipulation;text-decoration:none;-webkit-appearance:none}
+.abtn:active{opacity:.7}
+.abtn.red{background:#b71c1c;color:#fff}
+.abtn.blue{background:#1565c0;color:#fff}
+.abtn.green{background:#2e7d32;color:#fff}
+.abtn.orange{background:#e65100;color:#fff}
+.abtn.gray{background:#2a3a4a;color:#ccc}
+
+/* ══ 입력 ══ */
+.inp{background:#0d1117;border:2px solid #37474f;border-radius:12px;color:var(--text);
+  font-size:14px;padding:11px 13px;font-family:inherit;width:100%;outline:none;margin-top:10px;transition:border-color .2s}
+.inp:focus{border-color:var(--blue2)}
+.inp-row{display:flex;gap:8px;margin-top:8px}
+.inp-row .inp{margin-top:0}
+
+/* ══ 탑승객 ══ */
+.p-item{background:#0d1117;border-radius:10px;padding:9px 13px;margin-bottom:6px;
+  display:flex;align-items:center;gap:10px;border:1px solid var(--border)}
+.p-num{font-size:12px;color:var(--sub);width:18px}
+.p-info{flex:1;font-size:13px;font-weight:700}
+.p-del{background:none;border:none;color:#546e7a;font-size:15px;cursor:pointer;padding:0 4px;touch-action:manipulation}
+
+/* ══ 사진 촬영 ══ */
+.photo-guide{background:#1a0a28;border-radius:14px;padding:13px 15px;margin-top:10px;border:1px solid #4a148c}
+.pg-title{font-size:12px;font-weight:700;color:#ce93d8;margin-bottom:10px}
+.pg-step{display:flex;align-items:center;gap:10px;padding:9px 11px;background:#21062d;
+  border-radius:10px;cursor:pointer;transition:background .15s;border:1px solid transparent;
+  margin-bottom:7px;touch-action:manipulation}
+.pg-step.done{background:#0d1a0d;border-color:#2e7d32}
+.pg-step-num{width:20px;height:20px;border-radius:50%;background:#4a148c;color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.pg-step.done .pg-step-num{background:var(--green2)}
+.pg-step-txt{font-size:13px;font-weight:900;flex:1}
+.pg-step.done .pg-step-txt{color:#81c784}
+.ph-thumb{width:56px;height:56px;border-radius:8px;object-fit:cover;border:2px solid #4a148c;margin:4px}
+
+/* ══ 경고 ══ */
+.warn-box{background:#1a0800;border-left:4px solid var(--orange);border-radius:0 12px 12px 0;
+  padding:13px 16px;margin-top:14px;font-size:12px;color:#ffcc80;line-height:1.8}
+
+/* ══ 내비 ══ */
+.nav-row{display:flex;gap:8px;padding:13px 16px;border-top:1px solid var(--border)}
+.nav-btn{flex:1;padding:13px;border-radius:14px;border:none;font-size:15px;font-weight:900;
+  cursor:pointer;font-family:inherit;transition:transform .12s;touch-action:manipulation;-webkit-appearance:none}
+.nav-btn:active{transform:scale(.97)}
+.nav-prev{background:#21262d;color:var(--sub)}
+.nav-next{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff}
+.nav-done{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff}
+.nav-send{background:linear-gradient(135deg,var(--red),var(--red2));color:#fff}
+
+/* ══ 완료 ══ */
+.complete-wrap{text-align:center;padding:40px 20px}
+.comp-icon{font-size:72px;animation:pop .5s}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.1)}100%{transform:scale(1)}}
+.comp-title{font-size:26px;font-weight:900;color:#81c784;margin:16px 0 10px}
+.comp-sub{font-size:13px;color:var(--sub);line-height:1.8}
+
+/* ══ 설정 ══ */
+.cfg-group{background:var(--card);border-radius:16px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border)}
+.cfg-head{padding:10px 16px;background:#1a2030;font-size:12px;font-weight:700;color:#64b5f6;letter-spacing:1px}
+.cfg-row{padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:flex-start;gap:10px}
+.cfg-ico{font-size:22px;flex-shrink:0;margin-top:4px}
+.cfg-con{flex:1}
+.cfg-lbl{font-size:14px;font-weight:900;margin-bottom:6px}
+.save-btn{width:100%;background:linear-gradient(135deg,var(--green),var(--green2));border:none;
+  border-radius:16px;padding:15px;font-size:17px;font-weight:900;color:#fff;cursor:pointer;
+  font-family:inherit;transition:transform .12s;touch-action:manipulation;-webkit-appearance:none}
+.save-btn:active{transform:scale(.97)}
+
+/* ══ 카메라 ══ */
+#camOvl{display:none;position:fixed;inset:0;max-width:480px;margin:0 auto;background:#000;z-index:600;flex-direction:column}
+#camOvl.on{display:flex}
+#camVid{width:100%;flex:1;object-fit:cover}
+.cam-top{background:rgba(0,0,0,.8);padding:13px 16px;display:flex;align-items:center;gap:12px}
+.cam-guide-txt{flex:1;font-size:14px;font-weight:700;color:#fff;line-height:1.4}
+.cam-close{background:#333;border:none;color:#fff;border-radius:50%;width:34px;height:34px;
+  font-size:16px;cursor:pointer;touch-action:manipulation;-webkit-appearance:none}
+.cam-bot{background:rgba(0,0,0,.85);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cam-thumbs{display:flex;gap:6px;flex:1;overflow-x:auto;scrollbar-width:none}
+.cam-thumbs::-webkit-scrollbar{display:none}
+.cam-th{width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;border:2px solid #4a148c}
+.cam-shutter{width:58px;height:58px;border-radius:50%;background:#fff;border:4px solid #ccc;
+  cursor:pointer;flex-shrink:0;transition:transform .1s;touch-action:manipulation;-webkit-appearance:none}
+.cam-shutter:active{transform:scale(.88)}
+.cam-done-btn{background:var(--green2);color:#fff;border:none;border-radius:50px;
+  padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
+  flex-shrink:0;touch-action:manipulation;-webkit-appearance:none}
+
+/* ══ 모달 ══ */
+#modal{display:none;position:fixed;inset:0;max-width:480px;margin:0 auto;
+  background:rgba(0,0,0,.82);z-index:700;align-items:center;justify-content:center;padding:20px}
+#modal.on{display:flex}
+.modal-box{background:var(--card2);border-radius:20px;padding:22px;width:100%;max-width:380px;animation:fu .2s}
+.modal-box h3{font-size:17px;font-weight:900;margin-bottom:10px}
+.modal-box p{font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:18px}
+.modal-btns{display:flex;gap:10px}
+.mbtn{flex:1;padding:12px;border-radius:12px;border:none;font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-appearance:none}
+.mbtn.c{background:#2a3a4a;color:var(--sub)}
+.mbtn.r{background:var(--red);color:#fff}
+.mbtn.b{background:var(--blue2);color:#fff}
+.mbtn.g{background:var(--green2);color:#fff}
+
+/* ══ 토스트 ══ */
+#toast{display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);
+  padding:10px 22px;border-radius:50px;font-size:13px;font-weight:700;z-index:999;
+  white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+#toast.on{display:block;animation:fu .2s}
+#toast.g{background:#2e7d32;color:#fff}
+#toast.r{background:#c62828;color:#fff}
+#toast.b{background:#1565c0;color:#fff}
+#toast.o{background:#e65100;color:#fff}
+
+/* ══ 경보 오버레이 ══ */
+#alarmOvl{display:none;position:fixed;inset:0;max-width:480px;margin:0 auto;
+  background:rgba(150,0,0,.97);z-index:8000;flex-direction:column;align-items:center;justify-content:center;padding:30px}
+#alarmOvl.on{display:flex;animation:flashRed .5s infinite alternate}
+@keyframes flashRed{from{background:rgba(150,0,0,.97)}to{background:rgba(220,20,20,.99)}}
+.alarm-icon{font-size:90px;animation:shake .3s infinite}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.alarm-title{font-size:24px;font-weight:900;color:#fff;margin:16px 0 8px;text-align:center}
+.alarm-body{font-size:14px;color:rgba(255,255,255,.9);text-align:center;line-height:1.8;margin-bottom:20px}
+.alarm-time{font-size:12px;color:rgba(255,200,200,.8);margin-bottom:22px}
+.alarm-confirm{background:#fff;color:#8b0000;border:none;border-radius:60px;
+  padding:17px 46px;font-size:19px;font-weight:900;cursor:pointer;font-family:inherit;
+  box-shadow:0 8px 30px rgba(0,0,0,.5);animation:pulse 1s infinite;touch-action:manipulation;-webkit-appearance:none}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.alarm-sub{font-size:12px;color:rgba(255,200,200,.7);margin-top:14px;text-align:center}
+
+/* ══ Firebase 팝업 ══ */
+#fbSetup{display:none;position:fixed;inset:0;max-width:480px;margin:0 auto;
+  background:rgba(0,0,0,.92);z-index:7000;align-items:center;justify-content:center;padding:20px}
+#fbSetup.on{display:flex}
+.fb-box{background:#0d1a35;border-radius:22px;padding:22px;width:100%;border:1px solid #1a3060}
+.fb-box h3{font-size:17px;font-weight:900;color:#4fc3f7;margin-bottom:12px}
+.fb-box p{font-size:12px;color:#90caf9;line-height:1.8;margin-bottom:14px}
+.fb-inp{background:#050e1f;border:2px solid #1a3060;border-radius:12px;color:#fff;
+  font-size:12px;padding:10px 12px;width:100%;font-family:inherit;margin-bottom:8px;outline:none}
+.fb-inp:focus{border-color:#4fc3f7}
+.fb-save{background:#1565c0;color:#fff;border:none;border-radius:14px;padding:13px;
+  width:100%;font-size:15px;font-weight:900;cursor:pointer;font-family:inherit;margin-top:4px;touch-action:manipulation;-webkit-appearance:none}
+.fb-skip{background:#37474f;color:#ccc;border:none;border-radius:14px;padding:10px;
+  width:100%;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px;touch-action:manipulation;-webkit-appearance:none}
+
+/* ══ 푸시 배지 ══ */
+.push-badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700}
+.push-badge.on{background:#1b5e20;color:#80cbc4}
+.push-badge.off{background:#37474f;color:#aaa}
+.push-badge.err{background:#7f0000;color:#ff8a80}
+</style>
+</head>
+<body>
+
+<!-- 스플래시 -->
+<div id="splash">
+  <div class="sp-bus">🚌</div>
+  <div class="sp-h1">매일흥양</div>
+  <div class="sp-h2">전세버스 사고처리 매뉴얼</div>
+  <button id="btnBoot" type="button">시 작</button>
+  <div class="sp-hint">앱 실행 후 위치가 자동으로 파악됩니다<br><small style="opacity:.7">⚙️ 설정에서 운전자 정보를 먼저 등록하세요</small></div>
+</div>
+
+<!-- 탑바 -->
+<div id="topbar">
+  <img src="./icon-192.png" style="width:26px;height:26px;object-fit:contain;flex-shrink:0" alt="">
+  <div id="topTitle">매일흥양 사고처리</div>
+  <button class="tb-btn" id="btnGoSettings" type="button">⚙️</button>
+</div>
+
+<div id="scrollArea">
+  <!-- 홈 탭 -->
+  <div id="tab-home" class="page on">
+    <div class="gps-bar">
+      <div class="gps-led" id="gpsLed"></div>
+      <div class="gps-txt" id="gpsTxt">위치 파악 중...</div>
+      <button class="gps-retry" id="btnGpsRetry" type="button">재시도</button>
+    </div>
+    <div class="sos-wrap">
+      <div class="sos-ring"></div>
+      <button class="sos-btn" id="btnSOS" type="button">
+        <div class="sos-icon">🆘</div>
+        <div>
+          <div class="sos-main">사고처리 시작</div>
+          <div class="sos-sub">누르면 → 관리자 전원에게 즉시 문자 전송<br>사고처리 단계 자동 시작</div>
+        </div>
+      </button>
+    </div>
+    <div class="stitle">긴급 연락처</div>
+    <a class="call-card" href="tel:112"><div class="cc-icon">🚔</div><div><div class="cc-name">경찰 신고</div><div class="cc-num">112</div></div><span class="cc-btn">전화</span></a>
+    <a class="call-card" href="tel:119"><div class="cc-icon">🚑</div><div><div class="cc-name">소방·구급대</div><div class="cc-num">119</div></div><span class="cc-btn">전화</span></a>
+    <a class="call-card" href="tel:15883080"><div class="cc-icon">🛡️</div><div><div class="cc-name">전국버스공제조합</div><div class="cc-num">1588-3080</div></div><span class="cc-btn">전화</span></a>
+  </div>
+
+  <!-- 사고처리 탭 -->
+  <div id="tab-accident" class="page">
+    <div class="step-indicator" id="stepInd"></div>
+    <div id="stepContent"></div>
+  </div>
+
+  <!-- 설정 탭 -->
+  <div id="tab-settings" class="page">
+    <div class="stitle">운전자 정보</div>
+    <div class="cfg-group">
+      <div class="cfg-head">👤 기사 정보 (전송 메시지에 자동 포함)</div>
+      <div class="cfg-row"><div class="cfg-ico">🙍</div><div class="cfg-con"><div class="cfg-lbl">기사 이름</div><input class="inp" id="cfgName" placeholder="홍길동" maxlength="10"></div></div>
+      <div class="cfg-row"><div class="cfg-ico">📱</div><div class="cfg-con"><div class="cfg-lbl">기사 핸드폰</div><input class="inp" id="cfgPhone" placeholder="010-0000-0000" inputmode="tel" maxlength="13"></div></div>
+      <div class="cfg-row"><div class="cfg-ico">🚌</div><div class="cfg-con"><div class="cfg-lbl">차량 번호</div><input class="inp" id="cfgCar" placeholder="전남 70 바 0000" maxlength="15"></div></div>
+    </div>
+    <div class="stitle" style="display:flex;align-items:center;justify-content:space-between">
+      <span>긴급 연락처 (사고 시 동시 전송)</span>
+      <button id="btnAddContact" type="button" style="background:#1565c0;color:#fff;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-appearance:none">+ 추가</button>
+    </div>
+    <div class="cfg-group" id="contactCfg"></div>
+    <button class="save-btn" id="btnSaveCfg" type="button">💾 저장</button>
+    <div class="stitle" style="margin-top:24px">푸시 알림 설정</div>
+    <div class="cfg-group">
+      <div class="cfg-head">🔔 경보 푸시알림</div>
+      <div class="cfg-row"><div class="cfg-ico">📡</div><div class="cfg-con">
+        <div class="cfg-lbl">현재 상태</div>
+        <div id="pushStatusBadge" class="push-badge off">⚫ 비활성</div>
+        <div style="margin-top:8px;font-size:12px;color:#90caf9;line-height:1.8">Firebase 설정 완료 시 앱 설치자 전원에게 경보음 자동 발송</div>
+      </div></div>
+      <div class="cfg-row"><div class="cfg-ico">⚙️</div><div class="cfg-con">
+        <div class="cfg-lbl">Firebase 연동 설정</div>
+        <button id="btnOpenFb" type="button" style="background:#1565c0;color:#fff;border:none;border-radius:20px;padding:11px 18px;font-size:13px;font-weight:900;cursor:pointer;font-family:inherit;margin-top:8px;width:100%;touch-action:manipulation;-webkit-appearance:none">🔧 Firebase 설정 입력</button>
+        <div id="fbStatusTxt" style="margin-top:8px;font-size:12px;color:#546e7a"></div>
+      </div></div>
+      <div class="cfg-row"><div class="cfg-ico">🧪</div><div class="cfg-con">
+        <div class="cfg-lbl">경보음 테스트</div>
+        <button id="btnTestAlarm" type="button" style="background:#e65100;color:#fff;border:none;border-radius:20px;padding:11px 18px;font-size:13px;font-weight:900;cursor:pointer;font-family:inherit;margin-top:8px;width:100%;touch-action:manipulation;-webkit-appearance:none">🔊 경보음 테스트</button>
+      </div></div>
+    </div>
+    <div style="height:16px"></div>
+  </div>
+</div>
+
+<!-- 탭바 -->
+<div id="tabbar">
+  <div class="tab on" data-tab="home" id="tb-home"><span class="ti">🏠</span><span class="tl">홈</span></div>
+  <div class="tab" data-tab="accident" id="tb-accident"><span class="ti">🚨</span><span class="tl">사고처리</span></div>
+  <div class="tab" data-tab="settings" id="tb-settings"><span class="ti">⚙️</span><span class="tl">설정</span></div>
+</div>
+
+<!-- 카메라 -->
+<div id="camOvl">
+  <div class="cam-top">
+    <div class="cam-guide-txt" id="camGuideTxt">촬영하세요</div>
+    <button class="cam-close" id="btnCamClose" type="button">✕</button>
+  </div>
+  <video id="camVid" autoplay playsinline muted></video>
+  <div style="text-align:center;background:rgba(0,0,0,.85);padding:6px;font-size:11px;color:#ff9800" id="camSubTxt"></div>
+  <div class="cam-bot">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div class="cam-thumbs" id="camThumbs"></div>
+      <div style="font-size:11px;color:#ccc" id="camCount">0장</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+      <button class="cam-shutter" id="btnSnap" type="button"></button>
+      <button class="cam-done-btn" id="btnCamDone" type="button">완료 ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- 경보 오버레이 -->
+<div id="alarmOvl">
+  <div class="alarm-icon">🚨</div>
+  <div class="alarm-title" id="alarmTitle">사고 발생!</div>
+  <div class="alarm-body" id="alarmBody">즉시 확인하세요</div>
+  <div class="alarm-time" id="alarmTime"></div>
+  <button class="alarm-confirm" id="btnAlarmConfirm" type="button">✅ 확인</button>
+  <div class="alarm-sub">확인 버튼을 누를 때까지 경보가 울립니다</div>
+</div>
+
+<!-- Firebase 설정 팝업 -->
+<div id="fbSetup">
+  <div class="fb-box">
+    <h3>🔔 푸시알림 설정</h3>
+    <p>Firebase 서버키를 입력하면 경보 푸시알림이 활성화됩니다.</p>
+    <input class="fb-inp" id="fbServerKey" placeholder="AAAA... (서버 키)">
+    <input class="fb-inp" id="fbSenderId" placeholder="발신자 ID (숫자)">
+    <input class="fb-inp" id="fbApiKey" placeholder="웹 API 키">
+    <input class="fb-inp" id="fbProjectId" placeholder="프로젝트 ID">
+    <input class="fb-inp" id="fbAppId" placeholder="앱 ID">
+    <button class="fb-save" id="btnFbSave" type="button">💾 저장 및 활성화</button>
+    <button class="fb-skip" id="btnFbSkip" type="button">나중에 설정</button>
+  </div>
+</div>
+
+<!-- 모달 -->
+<div id="modal">
+  <div class="modal-box">
+    <h3 id="mh"></h3><p id="mp"></p>
+    <div class="modal-btns" id="mbtns"></div>
+  </div>
+</div>
+<div id="toast"></div>
+<canvas id="snapCanvas" style="display:none"></canvas>
+
+<script>
+/* ============================================================
+   매일흥양 사고처리 v10
+   핵심 수정:
+   1. data-dummy="..." 인라인 이벤트 100% 제거 → addEventListener
+   2. 시작버튼: click + touchend 이중 연결, once:true로 중복방지
+   3. 스플래시: off(fade) → gone(display:none) 순서 보장
+   4. checkResume: 스플래시 완전히 사라진 후 실행
+   5. sendFirst: 탭 전환 후 100ms 지연 실행 (화면 먼저)
+   6. Firebase 오류 시 앱 중단 없음 (try/catch 완전 래핑)
+============================================================ */
+'use strict';
+
+/* ── 전역 상태 ── */
+let CFG = {name:'',phone:'',car:'',contacts:[]};
+let gpsCoords = null, gpsAddress = '';
+let curStep = 0, stepDone = [];
+let camStream = null, camPhotoSlot = -1, camMaxSnaps = 1, camSnapCount = 0;
+let ACC = {passengers:[],photos:[],otherCar:'',otherIns:'',otherInsPhone:'',sentFirst:false};
+const STEPS = [
+  {label:'즉시조치'},{label:'부상확인'},{label:'엔진끄기'},{label:'공제접수'},
+  {label:'탑승객'},{label:'담당자'},{label:'현장촬영'},{label:'상대번호'},
+  {label:'상대보험'},{label:'최종보고'}
+];
+stepDone = STEPS.map(()=>false);
+
+/* ── 유틸: 버튼 바인딩 (click + touchend) ── */
+function B(id, fn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', fn);
+  el.addEventListener('touchend', e => { e.preventDefault(); fn(e); }, {passive:false});
+}
+
+/* ── 초기화 ── */
+loadCfg();
+
+/* ★ 시작 버튼 — 가장 중요 ★ */
+(function() {
+  const btn = document.getElementById('btnBoot');
+  let fired = false;
+  function doBoot(e) {
+    if (fired) return; fired = true;
+    if (e) e.preventDefault();
+    const splash = document.getElementById('splash');
+    splash.classList.add('off');
+    startGPS();
+    setTimeout(function() {
+      splash.classList.add('gone');
+      checkResume();
+    }, 520);
+  }
+  btn.addEventListener('click', doBoot, {once:true});
+  btn.addEventListener('touchend', doBoot, {once:true, passive:false});
+})();
+
+/* ── 나머지 버튼 ── */
+B('btnGoSettings', ()=>goTab('settings'));
+B('btnGpsRetry', startGPS);
+B('btnSOS', startAccident);
+B('btnAddContact', addContact);
+B('btnSaveCfg', saveCfg);
+B('btnOpenFb', openFbSetup);
+B('btnFbSave', saveFbConfig);
+B('btnFbSkip', closeFbSetup);
+B('btnTestAlarm', testAlarm);
+B('btnAlarmConfirm', confirmAlarm);
+B('btnCamClose', camDone);
+B('btnSnap', snap);
+B('btnCamDone', camDone);
+
+/* ── 탭바 ── */
+document.querySelectorAll('#tabbar .tab').forEach(function(tab) {
+  var h = function() { goTab(tab.dataset.tab); };
+  tab.addEventListener('click', h);
+  tab.addEventListener('touchend', function(e){e.preventDefault();h();},{passive:false});
+});
+
+/* ── 스텝 콘텐츠 이벤트 위임 ── */
+var stepEl = document.getElementById('stepContent');
+stepEl.addEventListener('click', handleDelegate);
+stepEl.addEventListener('touchend', function(e){
+  /* tel: 링크는 절대 막지 않음 — 전화걸기 허용 */
+  if (e.target.closest('a[href^="tel:"]')) return;
+  var t = e.target.closest('[data-act]');
+  if (t) { e.preventDefault(); handleDelegate(e); }
+},{passive:false});
+
+function handleDelegate(e) {
+  var el = e.target.closest('[data-act]');
+  if (!el) return;
+  var act = el.dataset.act;
+  if (!act) return;
+  var n = parseInt(el.dataset.n);
+  var acts = {
+    prev: prevStep, next: nextStep,
+    mark0:()=>markNext(0), mark1:()=>markNext(1), mark2:()=>markNext(2),
+    mark3:()=>markNext(3), mark4:()=>markNext(4), mark5:()=>markNext(5),
+    mark6:()=>markNext(6),
+    toggle: ()=>{ if(!isNaN(n)){stepDone[n]=!stepDone[n];renderStep();} },
+    removePax: ()=>{ if(!isNaN(n)){ACC.passengers.splice(n,1);renderStep();} },
+    addPax: addPax,
+    camSlot: ()=>{ if(!isNaN(n)) openCamSlot(n); },
+    camExtra: openCamExtra,
+    saveOtherCar: saveOtherCar,
+    saveOtherIns: saveOtherIns,
+    confirmSend: confirmAndSend,
+    resetAcc: resetAccident,
+    openMap: openMap,
+    sendFinalIdx: ()=>{ if(!isNaN(n)) sendFinalTo([n]); },
+    closeModal: closeModal,
+  };
+  if (acts[act]) acts[act]();
+}
+
+/* ── 서비스워커 등록 ── */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(function(reg){
+    reg.addEventListener('updatefound', function(){
+      var sw = reg.installing; if(!sw) return;
+      sw.addEventListener('statechange', function(){
+        if(sw.state==='installed'&&navigator.serviceWorker.controller)
+          sw.postMessage({type:'SKIP_WAITING'});
+      });
+    });
+  }).catch(function(){});
+  navigator.serviceWorker.addEventListener('controllerchange', function(){window.location.reload();});
+  navigator.serviceWorker.addEventListener('message', function(e){
+    if(e.data&&e.data.type==='ALARM_START') startAlarm(e.data.data&&e.data.data.title, e.data.data&&e.data.data.body, e.data.data&&e.data.data.sentAt);
+    if(e.data&&e.data.type==='ALARM_CONFIRM') confirmAlarm();
+  });
+}
+setTimeout(checkPendingAlarm, 1000);
+
+/* ============================================================
+   GPS
+============================================================ */
+function startGPS() {
+  var led=document.getElementById('gpsLed'), txt=document.getElementById('gpsTxt');
+  led.className='gps-led spin'; txt.textContent='위치 파악 중...';
+  if (!navigator.geolocation) { txt.textContent='⚠️ GPS 미지원'; led.className='gps-led'; return; }
+  navigator.geolocation.getCurrentPosition(
+    function(pos){
+      gpsCoords={lat:pos.coords.latitude,lng:pos.coords.longitude};
+      led.className='gps-led on';
+      gpsAddress='위도'+gpsCoords.lat.toFixed(5)+' 경도'+gpsCoords.lng.toFixed(5);
+      txt.textContent='✅ 위치 확인됨';
+      fetch('https://nominatim.openstreetmap.org/reverse?lat='+gpsCoords.lat+'&lon='+gpsCoords.lng+'&format=json&accept-language=ko')
+        .then(function(r){return r.json();})
+        .then(function(d){if(d&&d.display_name){gpsAddress=d.display_name;txt.textContent='📍 '+d.display_name.slice(0,30)+'...';}})
+        .catch(function(){});
+    },
+    function(err){
+      led.className='gps-led';
+      txt.textContent='⚠️ '+({1:'위치 권한 필요',2:'GPS 신호 없음',3:'수신 시간 초과'}[err.code]||'오류');
+    },
+    {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+  );
+}
+
+/* ============================================================
+   탭 전환
+============================================================ */
+function goTab(name) {
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('on');});
+  document.querySelectorAll('#tabbar .tab').forEach(function(t){t.classList.remove('on');});
+  var page=document.getElementById('tab-'+name), tb=document.getElementById('tb-'+name);
+  if(page) page.classList.add('on');
+  if(tb) tb.classList.add('on');
+  var titles={home:'🚌 매일흥양 사고처리',accident:'🚨 사고처리 진행',settings:'⚙️ 설정'};
+  document.getElementById('topTitle').textContent=titles[name]||'';
+  if(name==='settings'){renderCfgForm();updatePushBadge(fbMessaging?'on':'off');}
+  if(name==='accident') renderStep();
+  document.getElementById('scrollArea').scrollTo(0,0);
+}
+
+/* ============================================================
+   사고처리 시작
+============================================================ */
+function startAccident() {
+  clearProgress();
+  curStep=0; stepDone=STEPS.map(function(){return false;});
+  ACC={passengers:[],photos:[],otherCar:'',otherIns:'',otherInsPhone:'',sentFirst:true};
+  saveProgress();
+  goTab('accident');
+  setTimeout(sendFirst, 100);  /* 화면 전환 후 SMS 발송 */
+}
+
+/* ── 메시지 생성 ── */
+function buildFirstMsg() {
+  var now=new Date();
+  var t=now.getFullYear()+'.'+(now.getMonth()+1)+'.'+now.getDate()+' '+now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+  var map=gpsCoords?'https://maps.google.com/?q='+gpsCoords.lat+','+gpsCoords.lng:'위치 수신 중';
+  return encodeURIComponent('[🚨 교통사고 발생]\n기사: '+(CFG.name||'미입력')+'\n전화: '+(CFG.phone||'미입력')+'\n차량: '+(CFG.car||'미입력')+'\n시각: '+t+'\n\n📍 사고 위치:\n'+(gpsAddress||'위치 확인 중')+'\n\n🗺 지도:\n'+map+'\n\n──────────────\n매일흥양 사고처리앱');
+}
+
+function buildFinalMsg() {
+  var pax=ACC.passengers.map(function(p,i){return '  '+(i+1)+'. '+p.name+' '+p.phone;}).join('\n')||'  (없음)';
+  var map=gpsCoords?'https://maps.google.com/?q='+gpsCoords.lat+','+gpsCoords.lng:'위치 수신 중';
+  return '[📋 사고처리 최종 보고]\n기사: '+(CFG.name||'미입력')+'\n전화: '+(CFG.phone||'미입력')+'\n차량: '+(CFG.car||'미입력')+'\n\n📍 사고 위치:\n'+(gpsAddress||'확인 중')+'\n🗺 '+map+'\n\n👥 탑승객:\n'+pax+'\n\n🚗 상대 차량: '+(ACC.otherCar||'미입력')+'\n🛡️ 상대 보험사: '+(ACC.otherIns||'미입력')+'\n📞 보험사 전화: '+(ACC.otherInsPhone||'미입력')+'\n📷 현장 사진: '+ACC.photos.filter(Boolean).length+'장 촬영\n\n──────────────\n매일흥양 사고처리앱';
+}
+
+/* ── SMS 전송 ── */
+function sendSMSAll(phones, encodedMsg) {
+  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  var cleans=phones.map(function(p){return String(p).replace(/[^0-9]/g,'');}).filter(function(p){return p.length>=9;});
+  if(!cleans.length) return;
+  var sep=isIOS?',':';', q=isIOS?'&':'?';
+  var uri='sms:'+cleans.join(sep)+q+'body='+encodedMsg;
+  var a=document.createElement('a');
+  a.href=uri; a.style.cssText='position:fixed;opacity:0;pointer-events:none';
+  document.body.appendChild(a);
+  try{a.click();}catch(e){}
+  setTimeout(function(){try{document.body.removeChild(a);}catch(_){}},1000);
+}
+
+function sendFirst() {
+  var valid=CFG.contacts.filter(function(c){return c.phone;});
+  if(!valid.length){toast('⚠️ 설정에서 연락처를 등록하세요','r');return;}
+  sendSMSAll(valid.map(function(c){return c.phone;}), buildFirstMsg());
+  toast('🚨 관리자 '+valid.length+'명 문자 발송','r');
+  try{
+    var now=new Date();
+    sendPushToAll('🚨 매일흥양 교통사고 발생 — '+now.getHours()+':'+String(now.getMinutes()).padStart(2,'0'),
+      (CFG.name||'기사')+'님 차량 사고 발생\n위치: '+(gpsAddress||'확인중').slice(0,30)+'\n즉시 확인하세요!').catch(function(){});
+  }catch(e){}
+}
+
+function sendFinalTo(idxList) {
+  var photoCount=saveAllPhotosToGallery();
+  var msgText=buildFinalMsg()+(photoCount>0?'\n\n📷 현장사진 '+photoCount+'장 — 갤러리에서 확인':'');
+  var phones=idxList.map(function(i){return CFG.contacts[i].phone;}).filter(Boolean);
+  sendSMSAll(phones, encodeURIComponent(msgText));
+  clearProgress();
+  try{sendPushToAll('📋 매일흥양 사고처리 최종보고',(CFG.name||'기사')+'님 처리완료').catch(function(){});}catch(e){}
+  var names=idxList.map(function(i){return CFG.contacts[i].label||'연락처'+(i+1);}).join(', ');
+  toast('✅ '+names+' 최종보고 전송!','g');
+  setTimeout(function(){curStep=STEPS.length;renderStep();},800);
+}
+
+/* ============================================================
+   단계 렌더링
+============================================================ */
+function renderStep() {
+  renderIndicator();
+  if(curStep>=STEPS.length){renderComplete();return;}
+  [renderS1,renderS2,renderS3,renderS4,renderS5,renderS6,renderS7,renderS8,renderS9,renderS10][curStep]&&
+  [renderS1,renderS2,renderS3,renderS4,renderS5,renderS6,renderS7,renderS8,renderS9,renderS10][curStep]();
+}
+
+function renderIndicator() {
+  var el=document.getElementById('stepInd'); if(!el) return;
+  el.innerHTML=STEPS.map(function(s,i){
+    var cls=i<curStep?'done':i===curStep?'active':'';
+    return '<div class="si-node"><div class="si-circle '+cls+'">'+(i<curStep?'✓':i+1)+'</div><div class="si-label'+(cls==='active'?' active':'')+'">'+s.label+'</div></div>'+(i<STEPS.length-1?'<div class="si-line'+(i<curStep?' done':'')+'"></div>':'');
+  }).join('');
+}
+
+function nextStep(){curStep++;saveProgress();renderStep();document.getElementById('scrollArea').scrollTo(0,0);}
+function prevStep(){if(curStep>0){curStep--;saveProgress();renderStep();document.getElementById('scrollArea').scrollTo(0,0);}}
+function markNext(i){stepDone[i]=true;saveProgress();nextStep();}
+
+/* ── 단계별 렌더 함수 ── */
+var photoSlots=[
+  {label:'상대 차량 파손 부위',hint:'파손된 곳을 가까이 촬영하세요'},
+  {label:'상대 차량 번호판',hint:'번호판이 잘 보이도록 촬영하세요'},
+  {label:'차량 바퀴 + 차선',hint:'내 차 바퀴와 차선을 함께 촬영하세요'},
+  {label:'전체 사고 현장',hint:'양쪽 차량이 모두 보이게 넓게 촬영하세요'}
+];
+
+function sc(h){document.getElementById('stepContent').innerHTML=h;}
+
+function doneClass(i){return stepDone[i]?'done-item':'';}
+function doneNum(i){return stepDone[i]?'✓':i+1;}
+function doneChk(i){return stepDone[i]?'✓':'';}
+
+function navHtml(prev, nextLbl, nextAct, isDone) {
+  return '<div class="nav-row">'+(prev?'<button type="button" class="nav-btn nav-prev" data-act="prev">◀ 이전</button>':'')+'<button type="button" class="nav-btn '+(isDone?'nav-done':'nav-next')+'" data-act="'+nextAct+'">'+nextLbl+'</button></div>';
+}
+
+function renderS1(){sc('<div class="step-card"><div class="step-head"><div class="step-icon">🛑</div><div><div class="step-title">1단계 — 즉시 조치</div><div class="step-desc">사고 직후 가장 먼저</div></div></div><div class="action-item '+doneClass(0)+'" data-act="toggle" data-n="0"><div class="ai-num">'+doneNum(0)+'</div><div class="ai-body"><div class="ai-title">🚌 차량 정차 후 비상등 켜기</div><div class="ai-desc">갓길 또는 안전한 곳으로 이동 · 삼각대 후방 100m 이상 설치</div><div class="btn-row"><button type="button" class="abtn blue" data-act="openMap">🗺 내 위치 확인</button></div></div><div class="ai-check">'+doneChk(0)+'</div></div><div class="warn-box">🚫 현장 이탈 금지 (뺑소니 성립)<br>🚫 차량 임의 이동 금지 (증거 훼손)</div>'+navHtml(false,'확인 완료 →','mark0')+'</div>');}
+
+function renderS2(){sc('<div class="step-card"><div class="step-head"><div class="step-icon">🚑</div><div><div class="step-title">2단계 — 승객 부상 확인</div><div class="step-desc">부상자 있으면 즉시 119</div></div></div><div class="action-item '+doneClass(1)+'" data-act="toggle" data-n="1"><div class="ai-num">'+doneNum(1)+'</div><div class="ai-body"><div class="ai-title">👥 전 승객 부상 여부 확인</div><div class="ai-desc">부상자 발생 시 즉시 119 신고</div><div class="btn-row"><a class="abtn red" href="tel:119">📞 119</a><a class="abtn blue" href="tel:112">📞 112</a></div></div><div class="ai-check">'+doneChk(1)+'</div></div>'+navHtml(true,'확인 완료 →','mark1')+'</div>');}
+
+function renderS3(){sc('<div class="step-card"><div class="step-head"><div class="step-icon">🔑</div><div><div class="step-title">3단계 — 엔진·라이트 끄기</div><div class="step-desc">화재 예방</div></div></div><div class="action-item '+doneClass(2)+'" data-act="toggle" data-n="2"><div class="ai-num">'+doneNum(2)+'</div><div class="ai-body"><div class="ai-title">🔑 시동 OFF · 라이트 OFF</div><div class="ai-desc">연기·불꽃 발생 시 소화기 사용 후 즉시 대피</div></div><div class="ai-check">'+doneChk(2)+'</div></div>'+navHtml(true,'완료 →','mark2')+'</div>');}
+
+function renderS4(){sc('<div class="step-card"><div class="step-head"><div class="step-icon">🛡️</div><div><div class="step-title">4단계 — 공제조합 사고 접수</div><div class="step-desc">24시간 접수 가능</div></div></div><div class="action-item '+doneClass(3)+'" data-act="toggle" data-n="3"><div class="ai-num">'+doneNum(3)+'</div><div class="ai-body"><div class="ai-title">🛡️ 전국버스공제조합 사고 접수</div><div class="ai-desc">사고 위치·차량번호·사고경위 전달 · 접수번호 메모 필수</div><div class="btn-row"><a class="abtn orange" href="tel:15883080">📞 1588-3080</a></div></div><div class="ai-check">'+doneChk(3)+'</div></div>'+navHtml(true,'접수 완료 →','mark3')+'</div>');}
+
+function renderS5(){
+  var list=ACC.passengers;
+  var lh=list.length?list.map(function(p,i){return '<div class="p-item"><span class="p-num">'+(i+1)+'</span><span class="p-info">'+p.name+' / '+p.phone+'</span><button type="button" class="p-del" data-act="removePax" data-n="'+i+'">✕</button></div>';}).join(''):'<div style="font-size:12px;color:var(--sub);padding:8px 0">아직 입력된 승객이 없습니다</div>';
+  sc('<div class="step-card"><div class="step-head"><div class="step-icon">👥</div><div><div class="step-title">5단계 — 탑승객 정보 수집</div><div class="step-desc">이름과 전화번호 입력</div></div></div><div class="action-item"><div class="ai-num">5</div><div class="ai-body" style="width:100%"><div class="ai-title">👥 탑승객 정보 입력</div><div class="inp-row"><input class="inp" id="paxName" placeholder="이름" maxlength="10" style="flex:1"><input class="inp" id="paxPhone" placeholder="010-0000-0000" inputmode="tel" maxlength="13" style="flex:2"></div><button type="button" class="abtn green" data-act="addPax" style="margin-top:8px;width:100%;justify-content:center">+ 추가</button><div class="passenger-list">'+lh+'</div></div></div>'+navHtml(true,'다음 ('+list.length+'명) ▶','mark4')+'</div>');
+}
+
+function addPax(){
+  var n=document.getElementById('paxName').value.trim();
+  var p=document.getElementById('paxPhone').value.trim();
+  if(!n&&!p){toast('이름 또는 전화번호를 입력하세요','r');return;}
+  ACC.passengers.push({name:n||'(이름없음)',phone:p||'(전화없음)'});
+  saveProgress();renderStep();
+}
+
+function renderS6(){
+  var cts=CFG.contacts.filter(function(c){return c.phone;});
+  var ch=cts.length?cts.map(function(c){return '<a class="abtn blue" href="tel:'+c.phone.replace(/[^0-9]/g,'')+'" style="margin-bottom:6px">📞 '+(c.label||'담당자')+' '+c.phone+'</a>';}).join(''):'<div style="font-size:12px;color:var(--sub)">⚙️ 설정에서 연락처를 등록하세요</div>';
+  sc('<div class="step-card"><div class="step-head"><div class="step-icon">📞</div><div><div class="step-title">6단계 — 담당자 전화</div><div class="step-desc">직접 통화</div></div></div><div class="action-item '+doneClass(5)+'" data-act="toggle" data-n="5"><div class="ai-num">'+doneNum(5)+'</div><div class="ai-body"><div class="ai-title">📞 담당자에게 전화하세요</div><div class="btn-row" style="flex-direction:column;align-items:flex-start">'+ch+'</div></div><div class="ai-check">'+doneChk(5)+'</div></div>'+navHtml(true,'통화 완료 →','mark5')+'</div>');
+}
+
+function renderS7(){
+  var slots=photoSlots.map(function(s,i){var has=ACC.photos[i];return '<div class="pg-step '+(has?'done':'')+'" data-act="camSlot" data-n="'+i+'"><div class="pg-step-num">'+(has?'✓':i+1)+'</div><div class="pg-step-txt">'+s.label+'</div><div>'+(has?'✅':'📷')+'</div></div>';}).join('');
+  var thumbs=ACC.photos.filter(Boolean).map(function(p){return '<img class="ph-thumb" src="'+p+'">';}).join('');
+  var cnt=ACC.photos.filter(Boolean).length;
+  sc('<div class="step-card"><div class="step-head"><div class="step-icon">📷</div><div><div class="step-title">7단계 — 현장 사진 촬영</div><div class="step-desc">항목을 눌러 촬영</div></div></div><div class="action-item"><div class="ai-body" style="width:100%"><div class="photo-guide"><div class="pg-title">📸 촬영 항목 ('+cnt+'/4)</div>'+slots+(thumbs?'<div style="display:flex;flex-wrap:wrap">'+thumbs+'</div>':'')+'</div><div class="btn-row" style="margin-top:10px"><button type="button" class="abtn gray" data-act="camExtra">📷 추가 촬영</button></div></div></div>'+navHtml(true,'촬영 완료 →','mark6')+'</div>');
+}
+
+function renderS8(){sc('<div class="step-card"><div class="step-head"><div class="step-icon">🚗</div><div><div class="step-title">8단계 — 상대 차량 번호</div></div></div><div class="action-item"><div class="ai-num">8</div><div class="ai-body" style="width:100%"><div class="ai-title">🚗 상대 차량 번호 입력</div><input class="inp" id="otherCarInp" value="'+ACC.otherCar+'" placeholder="예) 서울 12 가 3456" maxlength="15" style="margin-top:10px;text-align:center;letter-spacing:2px"><button type="button" class="abtn blue" data-act="camSlot" data-n="1" style="margin-top:8px">📷 번호판 다시 촬영</button></div></div>'+navHtml(true,'입력 완료 →','saveOtherCar')+'</div>');}
+
+function saveOtherCar(){ACC.otherCar=document.getElementById('otherCarInp').value.trim();saveProgress();markNext(7);}
+
+function renderS9(){sc('<div class="step-card"><div class="step-head"><div class="step-icon">📋</div><div><div class="step-title">9단계 — 상대 보험사 정보</div></div></div><div class="action-item"><div class="ai-num">9</div><div class="ai-body" style="width:100%"><div class="ai-title">📋 상대방 보험(공제) 정보</div><input class="inp" id="otherInsInp" value="'+ACC.otherIns+'" placeholder="보험사 또는 공제조합명" maxlength="20" style="margin-top:10px"><input class="inp" id="otherInsPhInp" value="'+ACC.otherInsPhone+'" placeholder="보험사 전화번호" inputmode="tel" maxlength="14" style="margin-top:8px"><div class="warn-box" style="margin-top:10px">🚫 현장 합의 절대 금지<br>반드시 보험(공제)사를 통해 처리하세요</div></div></div>'+navHtml(true,'입력 완료 →','saveOtherIns')+'</div>');}
+
+function saveOtherIns(){ACC.otherIns=document.getElementById('otherInsInp').value.trim();ACC.otherInsPhone=document.getElementById('otherInsPhInp').value.trim();saveProgress();markNext(8);}
+
+function renderS10(){
+  var top2=CFG.contacts.slice(0,2).filter(function(c){return c.phone;}).map(function(c,i){return '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #1a3060"><div style="font-size:20px">✅</div><div style="flex:1"><div style="font-size:14px;font-weight:900">'+(c.label||'연락처'+(i+1))+'</div><div style="font-size:12px;color:#80cbc4">'+c.phone+'</div></div><div style="font-size:11px;color:#80cbc4;background:#0a3020;border-radius:20px;padding:5px 10px">자동</div></div>';}).join('');
+  var extra=CFG.contacts.slice(2).filter(function(c){return c.phone;}).map(function(c,i){return '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #1a3060"><input type="checkbox" id="cb_'+(i+2)+'" style="width:26px;height:26px;accent-color:#1565c0;cursor:pointer" checked><div style="flex:1"><div style="font-size:14px;font-weight:900">'+(c.label||'연락처'+(i+3))+'</div><div style="font-size:12px;color:#90caf9">'+c.phone+'</div></div><button type="button" data-act="sendFinalIdx" data-n="'+(i+2)+'" style="background:#1565c0;color:#fff;border:none;border-radius:20px;padding:7px 12px;font-size:12px;font-weight:900;cursor:pointer;font-family:inherit;touch-action:manipulation">지금전송</button></div>';}).join('');
+  var pcnt=ACC.photos.filter(Boolean).length;
+  var preview=buildFinalMsg();
+  sc('<div class="step-card"><div class="step-head"><div class="step-icon">📨</div><div><div class="step-title">10단계 — 최종 보고</div><div class="step-desc">확인 후 전송</div></div></div><div class="action-item"><div class="ai-body" style="width:100%"><div style="font-size:14px;font-weight:900;margin-bottom:8px">📋 전송 내용</div><div style="background:#0a1929;border:1px solid #1e3a5f;border-radius:12px;padding:12px;font-size:11px;color:#90caf9;line-height:1.8;white-space:pre-wrap;word-break:break-all;max-height:160px;overflow-y:auto">'+preview+'</div>'+(pcnt>0?'<div style="margin-top:8px;font-size:12px;color:#80cbc4;font-weight:700">📷 현장사진 '+pcnt+'장 — 갤러리 저장 후 안내 포함</div>':'')+'<div style="font-size:12px;font-weight:900;color:#80cbc4;margin:14px 0 6px">🚀 자동 전송 (1·2번)</div><div style="background:#051a10;border:2px solid #2e7d32;border-radius:12px;padding:12px 14px">'+(top2||'<div style="color:#546e7a;font-size:12px">1·2번 연락처 없음</div>')+'</div>'+(CFG.contacts.slice(2).filter(function(c){return c.phone;}).length?'<div style="font-size:12px;font-weight:900;color:#fff;margin:12px 0 6px">☑️ 추가 전송 선택 (3번~)</div><div style="background:#0d1a35;border:1px solid #1a3060;border-radius:12px;padding:12px 14px">'+extra+'</div>':'')+'</div></div><div class="nav-row"><button type="button" class="nav-btn nav-prev" data-act="prev">◀ 이전</button><button type="button" class="nav-btn nav-send" data-act="confirmSend">✅ 확인 후 전송</button></div></div>');
+}
+
+function confirmAndSend(){
+  var idxList=[];
+  CFG.contacts.slice(0,2).forEach(function(_,i){if(CFG.contacts[i]&&CFG.contacts[i].phone) idxList.push(i);});
+  CFG.contacts.slice(2).forEach(function(_,i){var cb=document.getElementById('cb_'+(i+2));if(cb&&cb.checked&&CFG.contacts[i+2]&&CFG.contacts[i+2].phone) idxList.push(i+2);});
+  if(!idxList.length){toast('전송할 연락처를 선택하세요','o');return;}
+  var names=idxList.map(function(i){return CFG.contacts[i].label||'연락처'+(i+1);});
+  showModal('📨 최종보고 전송','다음 연락처에 전송합니다:\n\n'+names.map(function(n){return '  ✅ '+n;}).join('\n')+'\n\n전송하시겠습니까?',
+    [{label:'취소',cls:'c',fn:closeModal},{label:'전송 실행 ▶',cls:'r',fn:function(){closeModal();sendFinalTo(idxList);}}]);
+}
+
+function renderComplete(){
+  document.getElementById('stepInd').innerHTML='';
+  sc('<div class="complete-wrap"><div class="comp-icon">✅</div><div class="comp-title">처리 완료</div><div class="comp-sub">모든 사고처리 단계를 완료했습니다.<br>수고하셨습니다.</div><button type="button" class="nav-btn nav-prev" data-act="resetAcc" style="margin-top:30px;width:100%">🏠 처음으로</button></div>');
+}
+
+function resetAccident(){
+  clearProgress();curStep=0;stepDone=STEPS.map(function(){return false;});
+  ACC={passengers:[],photos:[],otherCar:'',otherIns:'',otherInsPhone:'',sentFirst:false};
+  goTab('home');
+}
+
+/* ============================================================
+   카메라
+============================================================ */
+function openCamSlot(i){camPhotoSlot=i;startCam(photoSlots[i].label,photoSlots[i].hint,1);}
+function openCamExtra(){camPhotoSlot=-1;startCam('추가 사진 촬영','필요한 부분을 자유롭게 촬영하세요',99);}
+
+function startCam(label,hint,max){
+  camMaxSnaps=max;camSnapCount=0;
+  document.getElementById('camGuideTxt').textContent=label;
+  document.getElementById('camSubTxt').textContent=hint;
+  document.getElementById('camThumbs').innerHTML='';
+  document.getElementById('camCount').textContent='0장';
+  document.getElementById('camOvl').classList.add('on');
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})
+    .then(function(s){camStream=s;document.getElementById('camVid').srcObject=s;})
+    .catch(function(){
+      document.getElementById('camOvl').classList.remove('on');
+      var inp=document.createElement('input');
+      inp.type='file';inp.accept='image/*';inp.capture='environment';
+      inp.onchange=function(e){
+        var file=e.target.files[0];if(!file)return;
+        var reader=new FileReader();
+        reader.onload=function(ev){
+          if(camPhotoSlot>=0)ACC.photos[camPhotoSlot]=ev.target.result;
+          else ACC.photos.push(ev.target.result);
+          renderStep();toast('📷 사진 저장됨','g');
+        };
+        reader.readAsDataURL(file);
+      };
+      inp.click();
+    });
+}
+
+function snap(){
+  var vid=document.getElementById('camVid');
+  var canvas=document.getElementById('snapCanvas');
+  canvas.width=vid.videoWidth||640;canvas.height=vid.videoHeight||480;
+  canvas.getContext('2d').drawImage(vid,0,0);
+  var data=canvas.toDataURL('image/jpeg',.85);
+  if(camPhotoSlot>=0)ACC.photos[camPhotoSlot]=data;
+  else ACC.photos.push(data);
+  camSnapCount++;
+  saveToGallery(data,camSnapCount);
+  var img=document.createElement('img');
+  img.src=data;img.className='cam-th';
+  document.getElementById('camThumbs').appendChild(img);
+  document.getElementById('camCount').textContent=camSnapCount+'장 📁저장됨';
+  if(navigator.vibrate)navigator.vibrate(50);
+  toast('📸 촬영 완료 — 갤러리 저장됨','g');
+  if(camSnapCount>=camMaxSnaps&&camMaxSnaps===1)setTimeout(camDone,400);
+}
+
+function camDone(){
+  if(camStream){camStream.getTracks().forEach(function(t){t.stop();});camStream=null;}
+  document.getElementById('camOvl').classList.remove('on');
+  saveProgress();toast('📷 '+camSnapCount+'장 저장됨','g');renderStep();
+}
+
+/* ── 갤러리 저장 ── */
+function saveToGallery(dataUrl,idx){
+  try{
+    var now=new Date();
+    var ts=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'_'+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0')+String(now.getSeconds()).padStart(2,'0');
+    var byteStr=atob(dataUrl.split(',')[1]);
+    var arr=new Uint8Array(byteStr.length);
+    for(var i=0;i<byteStr.length;i++)arr[i]=byteStr.charCodeAt(i);
+    var blob=new Blob([arr],{type:'image/jpeg'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download='매일흥양_사고_'+ts+'_'+idx+'.jpg';
+    a.style.cssText='position:fixed;opacity:0;pointer-events:none';
+    document.body.appendChild(a);a.click();
+    setTimeout(function(){URL.revokeObjectURL(url);try{document.body.removeChild(a);}catch(_){}},1500);
+  }catch(e){}
+}
+
+function saveAllPhotosToGallery(){
+  var photos=ACC.photos.filter(Boolean);
+  photos.forEach(function(d,i){setTimeout(function(){saveToGallery(d,i+1);},i*300);});
+  return photos.length;
+}
+
+/* ============================================================
+   설정
+============================================================ */
+var DEFAULT_CONTACTS=[
+  {label:'박지수',phone:'010-4597-9407'},
+  {label:'전수용',phone:'010-4522-5385'},
+  {label:'천보현',phone:'010-7121-3601'}
+];
+function loadCfg(){
+  try{var s=localStorage.getItem('busCfgV10');if(s)CFG=JSON.parse(s);}catch(e){}
+  if(!CFG.contacts||!CFG.contacts.length)CFG.contacts=DEFAULT_CONTACTS.slice();
+}
+function saveCfg(){
+  CFG.name=(document.getElementById('cfgName').value||'').trim();
+  CFG.phone=(document.getElementById('cfgPhone').value||'').trim();
+  CFG.car=(document.getElementById('cfgCar').value||'').trim();
+  CFG.contacts=CFG.contacts.map(function(_,i){return {label:(document.getElementById('cl-'+i)&&document.getElementById('cl-'+i).value||'').trim(),phone:(document.getElementById('cp-'+i)&&document.getElementById('cp-'+i).value||'').trim()};}).filter(function(c){return c.label||c.phone;});
+  try{localStorage.setItem('busCfgV10',JSON.stringify(CFG));}catch(e){}
+  renderContactList();toast('✅ 저장 완료 (연락처 '+CFG.contacts.length+'명)','g');
+}
+function renderCfgForm(){
+  document.getElementById('cfgName').value=CFG.name||'';
+  document.getElementById('cfgPhone').value=CFG.phone||'';
+  document.getElementById('cfgCar').value=CFG.car||'';
+  renderContactList();
+}
+function renderContactList(){
+  var icons=['🏢','👤','🔧','📱','📲','🔔','👔','🚌','📋','☎️'];
+  var html='<div class="cfg-head">📞 사고 발생 시 동시 전송 ('+CFG.contacts.length+'명)</div>';
+  if(!CFG.contacts.length){html+='<div style="padding:14px;text-align:center;font-size:12px;color:var(--sub)">연락처를 추가하세요</div>';}
+  else{html+=CFG.contacts.map(function(c,i){return '<div class="cfg-row"><div class="cfg-ico">'+icons[i%icons.length]+'</div><div class="cfg-con"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><div class="cfg-lbl">연락처 '+(i+1)+'</div><button type="button" class="del-contact" data-i="'+i+'" style="background:#c62828;color:#fff;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">삭제</button></div><input class="inp" id="cl-'+i+'" value="'+c.label+'" placeholder="이름/직책" maxlength="15"><input class="inp" id="cp-'+i+'" value="'+c.phone+'" placeholder="010-0000-0000" inputmode="tel" maxlength="14" style="margin-top:6px"></div></div>';}).join('');}
+  document.getElementById('contactCfg').innerHTML=html;
+  document.querySelectorAll('.del-contact').forEach(function(btn){btn.addEventListener('click',function(){CFG.contacts.splice(+btn.dataset.i,1);renderContactList();});});
+}
+function addContact(){
+  CFG.contacts.push({label:'',phone:''});
+  renderContactList();
+  setTimeout(function(){var last=document.getElementById('cl-'+(CFG.contacts.length-1));if(last){last.scrollIntoView({behavior:'smooth',block:'center'});last.focus();}},100);
+}
+
+/* ── 진행 상태 ── */
+function saveProgress(){
+  try{localStorage.setItem('myilProgress10',JSON.stringify({curStep:curStep,stepDone:stepDone,ACC:{passengers:ACC.passengers,photos:[],otherCar:ACC.otherCar,otherIns:ACC.otherIns,otherInsPhone:ACC.otherInsPhone,sentFirst:ACC.sentFirst},gpsAddress:gpsAddress,gpsLat:gpsCoords?gpsCoords.lat:null,gpsLng:gpsCoords?gpsCoords.lng:null,savedAt:Date.now()}));}catch(e){}
+}
+function clearProgress(){try{localStorage.removeItem('myilProgress10');}catch(e){}}
+function checkResume(){
+  try{
+    var s=localStorage.getItem('myilProgress10');if(!s)return;
+    var state=JSON.parse(s);
+    if(Date.now()-state.savedAt>24*60*60*1000){clearProgress();return;}
+    if(state.curStep<1)return;
+    var mins=Math.floor((Date.now()-state.savedAt)/60000);
+    var ts=mins<60?mins+'분 전':Math.floor(mins/60)+'시간 전';
+    showModal('⚠️ 이어서 진행',ts+' 사고처리가 중단되었습니다.\n\n진행 단계: '+(state.curStep+1)+'단계\n탑승객: '+state.ACC.passengers.length+'명\n상대차: '+(state.ACC.otherCar||'미입력')+'\n\n이어서 진행하시겠습니까?',
+      [{label:'처음부터',cls:'c',fn:function(){clearProgress();closeModal();}},
+       {label:'이어서 진행 ▶',cls:'r',fn:function(){
+         curStep=state.curStep;stepDone=state.stepDone||STEPS.map(function(){return false;});
+         ACC=Object.assign({},ACC,state.ACC);
+         if(state.gpsLat){gpsCoords={lat:state.gpsLat,lng:state.gpsLng};gpsAddress=state.gpsAddress||'';}
+         closeModal();goTab('accident');renderStep();
+         toast('▶ '+curStep+'단계부터 이어서 진행','g');
+       }}]);
+  }catch(e){}
+}
+
+/* ── 유틸 ── */
+function openMap(){
+  if(gpsCoords)window.open('https://maps.google.com/?q='+gpsCoords.lat+','+gpsCoords.lng,'_blank');
+  else{startGPS();toast('📍 위치 파악 중...','b');}
+}
+var toastTimer=null;
+function toast(msg,type){
+  type=type||'b';
+  var el=document.getElementById('toast');
+  el.textContent=msg;el.className='toast on '+type;
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){el.className='toast';},2800);
+}
+function showModal(title,text,btns){
+  document.getElementById('mh').textContent=title;
+  document.getElementById('mp').innerHTML=text.replace(/\n/g,'<br>');
+  document.getElementById('mbtns').innerHTML=btns.map(function(b,i){return '<button type="button" class="mbtn '+b.cls+'" id="mb'+i+'">'+b.label+'</button>';}).join('');
+  btns.forEach(function(b,i){document.getElementById('mb'+i).addEventListener('click',b.fn);});
+  document.getElementById('modal').classList.add('on');
+}
+function closeModal(){document.getElementById('modal').classList.remove('on');}
+
+/* ============================================================
+   경보 시스템
+============================================================ */
+var fbCfg=null,fbApp=null,fbMessaging=null,fcmToken=null;
+var alarmAudioCtx=null,alarmInterval=null,alarmInterval2=null,alarmActive=false;
+
+function startAlarm(title,body,sentAt){
+  if(alarmActive)return;alarmActive=true;
+  try{localStorage.setItem('myilAlarmPending',JSON.stringify({title:title,body:body,sentAt:sentAt||Date.now(),confirmed:false}));}catch(e){}
+  document.getElementById('alarmTitle').textContent=title||'🚨 사고 발생!';
+  document.getElementById('alarmBody').textContent=body||'즉시 확인하세요';
+  var d=new Date(Number(sentAt)||Date.now());
+  document.getElementById('alarmTime').textContent='발생: '+d.getFullYear()+'.'+(d.getMonth()+1)+'.'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('alarmOvl').classList.add('on');
+  playAlarmSound();
+  alarmInterval=setInterval(function(){if(alarmActive)playAlarmSound();},5000);
+  if(navigator.vibrate){
+    var vib=function(){if(alarmActive)navigator.vibrate([800,300,800,300,800]);};
+    vib();alarmInterval2=setInterval(vib,4000);
+  }
+}
+function playAlarmSound(){
+  try{
+    if(!alarmAudioCtx||alarmAudioCtx.state==='closed')alarmAudioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    if(alarmAudioCtx.state==='suspended')alarmAudioCtx.resume();
+    var ctx=alarmAudioCtx,now=ctx.currentTime;
+    [{freq:1400,start:0,dur:.15},{freq:800,start:.18,dur:.15},{freq:1400,start:.36,dur:.15},
+     {freq:800,start:.54,dur:.15},{freq:1600,start:.72,dur:.25},{freq:1200,start:1,dur:.25},{freq:1600,start:1.28,dur:.4}]
+    .forEach(function(p){
+      var o=ctx.createOscillator(),g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.type='square';o.frequency.setValueAtTime(p.freq,now+p.start);
+      g.gain.setValueAtTime(0,now+p.start);
+      g.gain.linearRampToValueAtTime(.7,now+p.start+.02);
+      g.gain.linearRampToValueAtTime(.7,now+p.start+p.dur-.02);
+      g.gain.linearRampToValueAtTime(0,now+p.start+p.dur);
+      o.start(now+p.start);o.stop(now+p.start+p.dur+.05);
+    });
+  }catch(e){}
+}
+function confirmAlarm(){
+  alarmActive=false;
+  if(alarmInterval){clearInterval(alarmInterval);alarmInterval=null;}
+  if(alarmInterval2){clearInterval(alarmInterval2);alarmInterval2=null;}
+  if(navigator.vibrate)navigator.vibrate(0);
+  try{if(alarmAudioCtx){alarmAudioCtx.close();alarmAudioCtx=null;}}catch(_){}
+  document.getElementById('alarmOvl').classList.remove('on');
+  try{localStorage.removeItem('myilAlarmPending');}catch(e){}
+  toast('✅ 경보 확인 완료','g');
+}
+function testAlarm(){startAlarm('🔊 경보음 테스트','이것은 테스트입니다\n확인 버튼을 눌러 끄세요',Date.now());}
+function checkPendingAlarm(){
+  try{
+    var s=localStorage.getItem('myilAlarmPending');if(!s)return;
+    var alarm=JSON.parse(s);if(!alarm||alarm.confirmed)return;
+    if(Date.now()-(alarm.sentAt||0)>60*60*1000){localStorage.removeItem('myilAlarmPending');return;}
+    startAlarm(alarm.title,alarm.body,alarm.sentAt);
+  }catch(_){}
+}
+function updatePushBadge(state,msg){
+  var el=document.getElementById('pushStatusBadge'),txt=document.getElementById('fbStatusTxt');
+  if(!el)return;
+  if(state==='on'){el.className='push-badge on';el.textContent='🟢 활성 — 경보 수신 준비됨';}
+  else if(state==='err'){el.className='push-badge err';el.textContent='🔴 오류';if(txt&&msg)txt.textContent='⚠️ '+msg;}
+  else{el.className='push-badge off';el.textContent='⚫ 비활성';if(txt)txt.textContent='Firebase 설정 후 활성화됩니다';}
+}
+async function sendPushToAll(title,body){
+  if(!fbCfg||!fbCfg.serverKey)return false;
+  try{
+    var tokens=JSON.parse(localStorage.getItem('myilFcmTokens')||'[]');if(!tokens.length)return false;
+    var res=await fetch('https://fcm.googleapis.com/fcm/send',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'key='+fbCfg.serverKey},body:JSON.stringify({notification:{title:title,body:body},data:{type:'accident',sentAt:String(Date.now()),title:title,body:body},registration_ids:tokens})});
+    return(await res.json()).success>0;
+  }catch(e){return false;}
+}
+function initFirebase(){
+  try{
+    var s=localStorage.getItem('myilFbCfg');if(!s){updatePushBadge('off');return;}
+    fbCfg=JSON.parse(s);if(!fbCfg.apiKey){updatePushBadge('off');return;}
+    if(typeof firebase==='undefined'){updatePushBadge('err','Firebase SDK 로딩 실패');return;}
+    fbApp=firebase.apps.length?firebase.apps[0]:firebase.initializeApp({apiKey:fbCfg.apiKey,authDomain:fbCfg.projectId+'.firebaseapp.com',projectId:fbCfg.projectId,messagingSenderId:fbCfg.senderId,appId:fbCfg.appId});
+    fbMessaging=firebase.messaging();
+    Notification.requestPermission().then(function(perm){
+      if(perm!=='granted'){updatePushBadge('err','알림 권한 거부됨');return;}
+      fbMessaging.getToken({vapidKey:fbCfg.vapidKey||''}).then(function(token){
+        fcmToken=token;
+        var tokens=JSON.parse(localStorage.getItem('myilFcmTokens')||'[]');
+        if(!tokens.includes(token))tokens.push(token);
+        localStorage.setItem('myilFcmTokens',JSON.stringify(tokens));
+        updatePushBadge('on');
+      }).catch(function(e){updatePushBadge('err','토큰 오류: '+e.message);});
+    });
+    fbMessaging.onMessage(function(payload){startAlarm(payload.notification&&payload.notification.title,payload.notification&&payload.notification.body,payload.data&&payload.data.sentAt);});
+  }catch(e){updatePushBadge('err','초기화 오류: '+e.message);}
+}
+function saveFbConfig(){
+  var cfg2={serverKey:document.getElementById('fbServerKey').value.trim(),senderId:document.getElementById('fbSenderId').value.trim(),apiKey:document.getElementById('fbApiKey').value.trim(),projectId:document.getElementById('fbProjectId').value.trim(),appId:document.getElementById('fbAppId').value.trim()};
+  if(!cfg2.apiKey||!cfg2.projectId){toast('API키와 프로젝트ID는 필수입니다','r');return;}
+  localStorage.setItem('myilFbCfg',JSON.stringify(cfg2));fbCfg=cfg2;
+  closeFbSetup();toast('✅ Firebase 설정 저장됨','g');
+  var el=document.getElementById('fbStatusTxt');if(el)el.textContent='✅ Firebase 연동됨: '+cfg2.projectId;
+  setTimeout(function(){toast('앱을 다시 시작하면 푸시알림이 활성화됩니다','b');},1500);
+}
+function openFbSetup(){
+  try{var saved=JSON.parse(localStorage.getItem('myilFbCfg')||'{}');['ServerKey','SenderId','ApiKey','ProjectId','AppId'].forEach(function(k){var el=document.getElementById('fb'+k);if(el)el.value=saved[k.charAt(0).toLowerCase()+k.slice(1)]||'';});}catch(_){}
+  document.getElementById('fbSetup').classList.add('on');
+}
+function closeFbSetup(){document.getElementById('fbSetup').classList.remove('on');}
+</script>
+</body>
+</html>
